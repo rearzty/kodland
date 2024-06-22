@@ -48,13 +48,13 @@ def die_and_respawn():
     if enemy1_dead:
         enemy1.image = 'enemy1'
         enemy1_dead = False
-        enemy1.scale /= 2
+        enemy1.scale =  enemy1.scale / 2 if (enemy1.scale / 2) >= 0.5 else 0.5
         enemy1.pos = random.randint(1, 800), random.randint(1, 200)
         return
     if enemy2_dead:
         enemy2.image = 'enemy2'
         enemy2_dead = False
-        enemy2.scale /= 2
+        enemy2.scale =  enemy2.scale / 2 if (enemy2.scale / 2) >= 0.5 else 0.5
         enemy2.pos = random.randint(1, 800), random.randint(1, 200)
         return
 
