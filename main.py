@@ -3,15 +3,36 @@ import time
 import pgzrun
 from helper import *
 
-
 class Enemy():
-    def __init__(self, x, y, img):
-        self.x = x
-        self.y = y
-        self.image = img
-
-    def get_info(self, text):
-        print(f'{text}\nx = {self.x}\ny = {self.y}\nimage = {self.image}')
+    current_scale = 0
+    def __init__(self, actor, dead, enemy_speed, imgs: list):
+        self.actor = actor
+        self.dead = dead
+        self.enemy_speed = enemy_speed
+        self.imgs = imgs
+        self.chosen = imgs[0]
+        self.timer = 0
+    def spawn(self):
+        self.actor.pos = random.randint(600, 800), random.randint(1, 600)
+    def create(self):
+        self.actor.draw()
+    def walk(self):
+        self.change_img(self.imgs[0] if self.actor.image == self.imgs[1] else self.imgs[1])
+        self.change_scale(self.current_scale)
+        self.actor.right = self.actor.right - self.enemy_speed if self.actor.pos[0] > player.pos[0] else self.actor.right + self.enemy_speed
+        self.actor.top = self.actor.top - self.enemy_speed if self.actor.pos[1] > player.pos[1] else self.actor.top + self.enemy_speed
+    def respawn(self):
+        self.actor.image = self.imgs[0]
+        self.dead = False
+        self.change_scale(self.current_scale / 2 if (self.current_scale / 2) >= 0.5 else 0.5)
+        self.actor.pos = random.randint(1, 800), random.randint(1, 200)
+    def get_pos(self):
+        return [self.actor.pos[0], self.actor.pos[1]]
+    def change_scale(self, value):
+        self.actor.scale = value
+        self.current_scale = value
+    def change_img(self, value):
+        self.actor.image = value
 
 
 start_time = ''
@@ -20,16 +41,13 @@ HEIGHT = 600
 music_sounds = True
 player = Actor('player')
 enemy1 = Actor('enemy1')
-enemy1.scale = 0
-enm1 = Enemy(enemy1.pos[0], enemy1.pos[1], enemy1.image)
-enm1.get_info('enemy1 info')
+enm1 = Enemy(enemy1, dead=False, enemy_speed=4, imgs=['enemy1', 'enemy1_'])
 enemy2 = Actor('enemy2')
-enemy2.scale = 0
-enm2 = Enemy(enemy2.pos[0], enemy2.pos[1], enemy2.image)
-enm2.get_info('enemy2 info')
-enemy1_dead = False
-enemy2_dead = False
+enm2 = Enemy(enemy2, dead=False, enemy_speed=6, imgs=['enemy2', 'enemy2_'])
 speed = 1
+enm1.change_scale(0)
+enm2.change_scale(0)
+player_timer = 0
 player.pos = 400, 150
 player.scale = 2.5
 on_off_sounds = Actor('on_off', center=(130, 300))
@@ -41,32 +59,23 @@ exit_button.scale = 0.2
 game_started = False
 result = ''
 
-
 def die_and_respawn():
-    global enemy1_dead, enemy2_dead, speed
+    global speed
     speed -= 0.05
-    if enemy1_dead:
-        enemy1.image = 'enemy1'
-        enemy1_dead = False
-        enemy1.scale =  enemy1.scale / 2 if (enemy1.scale / 2) >= 0.5 else 0.5
-        enemy1.pos = random.randint(1, 800), random.randint(1, 200)
+    if enm1.dead:
+        enm1.respawn()
         return
-    if enemy2_dead:
-        enemy2.image = 'enemy2'
-        enemy2_dead = False
-        enemy2.scale =  enemy2.scale / 2 if (enemy2.scale / 2) >= 0.5 else 0.5
-        enemy2.pos = random.randint(1, 800), random.randint(1, 200)
+    if enm2.dead:
+        enm2.respawn()
         return
 
 
 def follow_player():
     if game_started:
-        if not enemy1_dead:
-            enemy1.right = enemy1.right - 4 if enemy1.pos[0] > player.pos[0] else enemy1.right + 4
-            enemy1.top = enemy1.top - 4 if enemy1.pos[1] > player.pos[1] else enemy1.top + 4
-        if not enemy2_dead:
-            enemy2.right = enemy2.right - 6 if enemy2.pos[0] > player.pos[0] else enemy2.right + 6
-            enemy2.top = enemy2.top - 6 if enemy2.pos[1] > player.pos[1] else enemy2.top + 6
+        if not enm1.dead:
+            enm1.walk()
+        if not enm2.dead:
+            enm2.walk()
 
         clock.schedule(follow_player, 0.1 * speed)
 
@@ -75,21 +84,28 @@ def play_music():
     if music_sounds:
         sounds.mus.play(-1)
 
-
 def draw():
     screen.fill((20, 0, 0))
     exit_button.draw()
     start_button.draw()
     on_off_sounds.draw()
     player.draw()
-    enemy1.draw()
-    enemy2.draw()
+    enm1.create()
+    enm2.create()
     screen.draw.text(result, center=(400, 500))
 
-
+def player_moving():
+    global player_timer
+    if keyboard.w or keyboard.a or keyboard.s or keyboard.d:
+        if player_timer == 10:
+            player.image = 'player' if player.image == 'player_' else 'player_'
+            player.scale = 2.5
+            player_timer = 0
+        player_timer+=1
 def update():
     global result
     if game_started:
+        player_moving()
         if keyboard.w:
             player.top -= 2
         if keyboard.a:
@@ -98,14 +114,14 @@ def update():
             player.top += 2
         if keyboard.d:
             player.right += 2
-        if (abs(enemy1.pos[0] - player.pos[0]) < 5 and abs(enemy1.pos[1] - player.pos[1]) < 5) or (
-                abs(enemy2.pos[0] - player.pos[0]) < 5 and abs(enemy2.pos[1] - player.pos[1]) < 5):
+        if (abs(enm1.get_pos()[0] - player.pos[0]) < 5 and abs(enm1.get_pos()[1] - player.pos[1]) < 5) or (
+                abs(enm2.get_pos()[0] - player.pos[0]) < 5 and abs(enm2.get_pos()[1] - player.pos[1]) < 5):
             result = f'Вы проиграли\nВам удалось продержаться {int(time.time() - start_time)} секунд\nПрограмма будет завершена через 5 секунд'
             clock.schedule(exit, 5.0)
 
 
 def on_mouse_down(pos):
-    global music_sounds, game_started, enemy1_dead, enemy2_dead, start_time
+    global music_sounds, game_started, start_time
     if on_off_sounds.collidepoint(pos):
         sounds.click.play()
         music_sounds = True if music_sounds == False else False
@@ -117,27 +133,26 @@ def on_mouse_down(pos):
         game_started = True
         play_music()
         player.pos = 400, 300
-        enemy1.scale = 2
-        enemy1.pos = random.randint(600, 800), random.randint(1, 600)
-        enemy2.scale = 2
-        enemy2.pos = random.randint(1, 200), random.randint(1, 600)
+        enm1.change_scale(2)
+        enm1.spawn()
+        enm2.change_scale(2)
+        enm2.spawn()
         follow_player()
         start_time = time.time()
     if exit_button.collidepoint(pos):
         sounds.click.play()
         exit()
-    if enemy1.collidepoint(pos) and not enemy1_dead:
-        enemy1_dead = True
-        enemy1.image = 'dead'
+    if enemy1.collidepoint(pos) and not enm1.dead:
+        enm1.dead = True
+        enm1.change_img('dead')
         sounds.switch.play()
         clock.schedule(die_and_respawn, 1.5)
 
-    if enemy2.collidepoint(pos) and not enemy2_dead:
-        enemy2_dead = True
-        enemy2.image = 'dead'
+    if enemy2.collidepoint(pos) and not enm2.dead:
+        enm2.dead = True
+        enm2.change_img('dead')
         sounds.switch.play()
         clock.schedule(die_and_respawn, 3.0)
 
 
-# start_game_menu()
 pgzrun.go()
